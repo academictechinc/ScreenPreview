@@ -1,4 +1,4 @@
-const CACHE_NAME = 'screen-preview-v2';
+const CACHE_NAME = 'screen-preview-v3';
 const FILES_TO_CACHE = [
   'index.html',
   'manifest.json',
