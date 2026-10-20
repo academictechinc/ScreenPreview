@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Screen Preview</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --border: #38383a;
+    --text: #f2f2f7;
+    --muted: #8e8e93;
+    --accent: #a855f7;
+    --accent-soft: rgba(168,85,247,0.22);
+    --calib: #ffd60a;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  .hidden{ display: none !important; }
+
+  html,body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
+  body{
+    display:flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  header{
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg);
+  }
+  header h1{ font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+
+  .icon-btn{
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: var(--surface);
+    color: var(--text);
+    display:flex; align-items:center; justify-content:center;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .icon-btn:active{ background: var(--surface-2); }
+  .icon-btn.invisible{ visibility: hidden; }
+
+  main{
+    flex: 1;
+    min-height: 0;
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #0a0a0c;
+  }
+
+  .empty-state{
+    display:flex; flex-direction: column; align-items:center;
+    gap: 18px; padding: 32px; text-align: center;
+  }
+  .empty-state .big-icon{
+    width: 64px; height: 64px; border-radius: 18px; background: var(--surface);
+    display:flex; align-items:center; justify-content:center; font-size: 28px;
+  }
+  .empty-state p{ color: var(--muted); font-size: 14px; max-width: 30ch; margin: 0; line-height: 1.5; }
+
+  .primary-btn{
+    background: var(--accent); color: white; border: none; border-radius: 14px;
+    padding: 14px 28px; font-size: 16px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .primary-btn:active{ opacity: 0.85; }
+  .secondary-btn{
+    background: var(--surface-2); color: var(--text); border: none; border-radius: 12px;
+    padding: 12px 20px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .secondary-btn:active{ background: var(--border); }
+
+  .photo-wrap{ position: relative; max-width: 100%; max-height: 100%; line-height: 0; }
+  .photo-wrap img{
+    display:block; max-width: 100%; max-height: 100%; width: auto; height: auto;
+    -webkit-user-select: none; user-select: none; pointer-events: none;
+  }
+  .photo-wrap > svg{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+
+  /* non-scaling strokes keep outlines a constant on-screen thickness no matter how big the photo is */
+  .calib-poly{ fill: rgba(255,214,10,0.10); stroke: var(--calib); stroke-width: 2.5px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8)); pointer-events: none; }
+  .calib-handle{ fill: var(--calib); stroke: #000; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .calib-hit{ fill: transparent; cursor: grab; }
+  .calib-tag{ fill: var(--calib); font-family: 'Inter', sans-serif; font-weight: 700; paint-order: stroke; stroke: rgba(0,0,0,0.75); stroke-linejoin: round; pointer-events: none; }
+
+  .screen-poly{ fill: var(--accent-soft); stroke: var(--accent); stroke-width: 3px; vector-effect: non-scaling-stroke; stroke-linejoin: round; cursor: grab; }
+  .resize-handle{ fill: var(--accent); stroke: white; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .resize-hit{ fill: transparent; cursor: nwse-resize; }
+  .screen-label{ fill: white; font-family: 'Inter', sans-serif; font-weight: 700; paint-order: stroke; stroke: rgba(0,0,0,0.6); stroke-linejoin: round; pointer-events: none; }
+
+  .loupe-border{ fill: none; stroke: white; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .loupe-cross{ stroke: var(--calib); vector-effect: non-scaling-stroke; stroke-width: 1.5px; }
+
+  footer{
+    flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border);
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .step-title{ font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; }
+  .step-hint{ font-size: 12.5px; color: var(--muted); margin: 6px 0 0; line-height: 1.45; }
+
+  .row{ display:flex; gap: 10px; align-items: center; }
+  .row + .row{ margin-top: 10px; }
+
+  .chips{ display:flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .chip{
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .chip:active{ background: var(--border); }
+
+  .input-pill{ flex: 1; display:flex; align-items:center; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .input-pill input{
+    flex:1; min-width:0; width:0; background: transparent; border: none; outline: none;
+    padding: 10px 8px 10px 14px; color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600;
+  }
+  .input-pill .suffix{ padding: 0 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; white-space: nowrap; }
+
+  .seg{ display:flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button{
+    flex:1; padding: 8px 6px; border: none; background: transparent; color: var(--muted);
+    font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 7px; cursor: pointer;
+  }
+  .seg button.active{ background: var(--accent); color: white; }
+
+  .action-row{ display:flex; gap: 10px; margin-top: 12px; }
+  .action-row .secondary-btn, .action-row .primary-btn{ flex: 1; text-align: center; }
+
+  .diag-readout{ font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .dim-readout{ font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+  #fileInput{ display:none; }
+
+  .toast{
+    position: fixed; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(28,28,30,0.96); color: var(--text); padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; max-width: 86vw; text-align: center;
+    transition: opacity 0.2s ease, transform 0.2s ease; z-index: 50;
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="icon-btn" id="resetBtn" title="New photo">↺</button>
+  <h1>Screen Preview</h1>
+  <button class="icon-btn invisible" id="saveBtn" title="Save image">⬇</button>
+</header>
+
+<main id="mainArea">
+  <div class="empty-state" id="emptyState">
+    <div class="big-icon">📷</div>
+    <p>Take or choose a photo of the wall, then drop a display onto it — in true perspective and true size.</p>
+    <button class="primary-btn" id="addPhotoBtn">Add Photo</button>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+
+  <div class="photo-wrap hidden" id="photoWrap">
+    <img id="photo" alt="">
+    <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</main>
+
+<footer class="hidden" id="calibFooter">
+  <p class="step-title">Step 1 — Mark Something You Know</p>
+  <p class="step-hint">Drag the four yellow corners onto a rectangle on the wall with a known size — a door, a window, or a sheet of paper taped up. Order: top-left, top-right, bottom-right, bottom-left. A magnifier shows while you drag.</p>
+  <div class="chips">
+    <button class="chip" data-w="8.5" data-h="11">Letter 8.5×11</button>
+    <button class="chip" data-w="11" data-h="8.5">Letter 11×8.5</button>
+    <button class="chip" data-w="36" data-h="80">Door 36×80</button>
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <div class="input-pill">
+      <input type="number" inputmode="decimal" step="0.1" id="refW" placeholder="0">
+      <span class="suffix">in wide</span>
+    </div>
+    <div class="input-pill">
+      <input type="number" inputmode="decimal" step="0.1" id="refH" placeholder="0">
+      <span class="suffix">in tall</span>
+    </div>
+  </div>
+  <div class="action-row">
+    <button class="primary-btn" id="setScaleBtn">Lock It In</button>
+  </div>
+</footer>
+
+<footer class="hidden" id="sizeFooter">
+  <p class="step-title">Step 2 — Size the Display</p>
+  <div class="row">
+    <div class="seg" id="ratioSeg" style="flex:1;">
+      <button class="active" data-r="1.7778">16:9</button>
+      <button data-r="1.6">16:10</button>
+      <button data-r="1.3333">4:3</button>
+    </div>
+    <div class="seg" id="orientSeg" style="flex:1;">
+      <button class="active" data-o="landscape">Land</button>
+      <button data-o="portrait">Port</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="input-pill">
+      <input type="number" inputmode="decimal" step="0.5" id="diagInput" placeholder="e.g. 75">
+      <span class="suffix">in diag</span>
+    </div>
+    <div class="diag-readout" id="diagReadout">—</div>
+  </div>
+  <p class="dim-readout" id="dimReadout"></p>
+  <p class="step-hint">Drag the display along the wall, or drag its corner dot to resize.</p>
+  <div class="action-row">
+    <button class="secondary-btn" id="recalibBtn">Redo Corners</button>
+    <button class="primary-btn" id="saveBtn2">Save Photo</button>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const els = {
+    emptyState: document.getElementById('emptyState'),
+    addPhotoBtn: document.getElementById('addPhotoBtn'),
+    fileInput: document.getElementById('fileInput'),
+    photoWrap: document.getElementById('photoWrap'),
+    photo: document.getElementById('photo'),
+    overlay: document.getElementById('overlay'),
+    calibFooter: document.getElementById('calibFooter'),
+    sizeFooter: document.getElementById('sizeFooter'),
+    refW: document.getElementById('refW'),
+    refH: document.getElementById('refH'),
+    setScaleBtn: document.getElementById('setScaleBtn'),
+    recalibBtn: document.getElementById('recalibBtn'),
+    resetBtn: document.getElementById('resetBtn'),
+    saveBtn: document.getElementById('saveBtn'),
+    saveBtn2: document.getElementById('saveBtn2'),
+    diagInput: document.getElementById('diagInput'),
+    diagReadout: document.getElementById('diagReadout'),
+    dimReadout: document.getElementById('dimReadout'),
+    toast: document.getElementById('toast')
+  };
+
+  const state = {
+    stage: 'empty',          // empty | calibrating | sizing
+    naturalW: 0, naturalH: 0,
+    quad: null,              // 4 image-pixel points: TL, TR, BR, BL of the known rectangle
+    refW: null, refH: null,  // real size of that rectangle, inches
+    H: null, Hinv: null,     // plane(inches) -> image(px) and its inverse
+    ratio: 16/9,
+    orientation: 'landscape',
+    diagIn: 75,
+    cx: 0, cy: 0             // display center on the wall plane, inches
+  };
+
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => els.toast.classList.remove('show'), 2600);
+  }
+
+  // =============== Perspective math (homography) ===============
+
+  // Solve the 3x3 matrix mapping 4 plane points -> 4 image points (direct linear transform, h33 = 1)
+  function solveHomography(src, dst){
+    const A = [], b = [];
+    for (let i = 0; i < 4; i++){
+      const x = src[i][0], y = src[i][1], u = dst[i][0], v = dst[i][1];
+      A.push([x, y, 1, 0, 0, 0, -u*x, -u*y]); b.push(u);
+      A.push([0, 0, 0, x, y, 1, -v*x, -v*y]); b.push(v);
+    }
+    const n = 8;
+    for (let col = 0; col < n; col++){
+      let piv = col;
+      for (let r = col + 1; r < n; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
+      if (Math.abs(A[piv][col]) < 1e-9) return null;
+      [A[col], A[piv]] = [A[piv], A[col]];
+      [b[col], b[piv]] = [b[piv], b[col]];
+      for (let r = col + 1; r < n; r++){
+        const f = A[r][col] / A[col][col];
+        for (let c = col; c < n; c++) A[r][c] -= f * A[col][c];
+        b[r] -= f * b[col];
+      }
+    }
+    const h = new Array(n);
+    for (let r = n - 1; r >= 0; r--){
+      let s = b[r];
+      for (let c = r + 1; c < n; c++) s -= A[r][c] * h[c];
+      h[r] = s / A[r][r];
+    }
+    return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+  }
+
+  function invert3(M){
+    const a = M[0], b = M[1], c = M[2], d = M[3], e = M[4], f = M[5], g = M[6], h = M[7], i = M[8];
+    const A = e*i - f*h, B = -(d*i - f*g), C = d*h - e*g;
+    const det = a*A + b*B + c*C;
+    if (Math.abs(det) < 1e-14) return null;
+    return [
+      A/det, -(b*i - c*h)/det, (b*f - c*e)/det,
+      B/det,  (a*i - c*g)/det, -(a*f - c*d)/det,
+      C/det, -(a*h - b*g)/det, (a*e - b*d)/det
+    ];
+  }
+
+  function applyMat(M, x, y){
+    const w = M[6]*x + M[7]*y + M[8];
+    if (Math.abs(w) < 1e-12) return null;
+    return { x: (M[0]*x + M[1]*y + M[2]) / w, y: (M[3]*x + M[4]*y + M[5]) / w, w: w };
+  }
+
+  // wall plane (inches) -> photo pixels; null if the point is behind the camera / at the horizon
+  function proj(x, y){
+    const p = applyMat(state.H, x, y);
+    return (p && p.w > 1e-6) ? p : null;
+  }
+  // photo pixels -> wall plane (inches)
+  function unproj(u, v){ return applyMat(state.Hinv, u, v); }
+
+  function isConvexClockwise(q){
+    for (let i = 0; i < 4; i++){
+      const p0 = q[i], p1 = q[(i+1) % 4], p2 = q[(i+2) % 4];
+      const cross = (p1.x - p0.x) * (p2.y - p1.y) - (p1.y - p0.y) * (p2.x - p1.x);
+      if (cross <= 0) return false;
+    }
+    return true;
+  }
+
+  // =============== Helpers ===============
+
+  function clientToSvg(clientX, clientY){
+    const pt = els.overlay.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    return pt.matrixTransform(els.overlay.getScreenCTM().inverse());
+  }
+
+  function svgNS(tag, attrs){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+    return el;
+  }
+
+  // Drag helper. Callbacks get the current + previous point in photo pixels.
+  // IMPORTANT: callbacks must update existing elements in place (never rebuild the overlay mid-drag),
+  // otherwise the browser drops the touch after the first move.
+  function makeDraggable(el, onMove, onEnd, onStart){
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      el.setPointerCapture(e.pointerId);
+      let last = clientToSvg(e.clientX, e.clientY);
+      if (onStart) onStart(last);
+      const move = (ev) => {
+        const cur = clientToSvg(ev.clientX, ev.clientY);
+        onMove(cur, last);
+        last = cur;
+      };
+      const up = () => {
+        try { el.releasePointerCapture(e.pointerId); } catch(_){}
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        if (onEnd) onEnd();
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    });
+  }
+
+  const f1 = (n) => (Math.round(n * 10) / 10).toString();
+
+  // =============== Photo loading / reset ===============
+
+  els.addPhotoBtn.addEventListener('click', () => els.fileInput.click());
+
+  els.fileInput.addEventListener('change', () => {
+    const file = els.fileInput.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    els.photo.onload = () => {
+      state.naturalW = els.photo.naturalWidth;
+      state.naturalH = els.photo.naturalHeight;
+      els.overlay.setAttribute('viewBox', '0 0 ' + state.naturalW + ' ' + state.naturalH);
+      state.H = null; state.Hinv = null;
+      startCalibration(true);
+    };
+    els.photo.src = url;
+  });
+
+  function resetAll(){
+    state.stage = 'empty';
+    state.quad = null; state.H = null; state.Hinv = null;
+    els.fileInput.value = '';
+    els.emptyState.classList.remove('hidden');
+    els.photoWrap.classList.add('hidden');
+    els.calibFooter.classList.add('hidden');
+    els.sizeFooter.classList.add('hidden');
+    els.saveBtn.classList.add('invisible');
+    els.overlay.innerHTML = '';
+  }
+  els.resetBtn.addEventListener('click', resetAll);
+
+  // =============== Stage 1: mark a known rectangle ===============
+
+  let calibRefs = null;
+
+  function startCalibration(fresh){
+    state.stage = 'calibrating';
+    els.emptyState.classList.add('hidden');
+    els.photoWrap.classList.remove('hidden');
+    els.calibFooter.classList.remove('hidden');
+    els.sizeFooter.classList.add('hidden');
+    els.saveBtn.classList.add('invisible');
+
+    if (fresh || !state.quad){
+      const w = state.naturalW, h = state.naturalH;
+      state.quad = [
+        { x: w * 0.30, y: h * 0.28 },
+        { x: w * 0.70, y: h * 0.28 },
+        { x: w * 0.70, y: h * 0.62 },
+        { x: w * 0.30, y: h * 0.62 }
+      ];
+    }
+    buildCalibration();
+  }
+
+  function buildCalibration(){
+    els.overlay.innerHTML = '';
+    const W = state.naturalW;
+    const r = W * 0.018;
+    const tags = ['TL', 'TR', 'BR', 'BL'];
+
+    const poly = svgNS('polygon', { class: 'calib-poly' });
+    els.overlay.appendChild(poly);
+
+    const dots = [], hits = [], labels = [];
+    state.quad.forEach((p, i) => {
+      const dot = svgNS('circle', { class: 'calib-handle', r: r });
+      const hit = svgNS('circle', { class: 'calib-hit', r: r * 2.6 });
+      const tag = svgNS('text', { class: 'calib-tag', 'font-size': W * 0.03, 'stroke-width': W * 0.008 });
+      tag.textContent = tags[i];
+      els.overlay.appendChild(dot);
+      els.overlay.appendChild(tag);
+      els.overlay.appendChild(hit);
+      dots.push(dot); hits.push(hit); labels.push(tag);
+    });
+
+    // magnifier (shown only while dragging a corner)
+    const L = W * 0.26, zoom = 3, region = L / zoom;
+    const loupeSvg = svgNS('svg', { width: L, height: L, overflow: 'hidden' });
+    const loupeImg = svgNS('image', { x: 0, y: 0, width: state.naturalW, height: state.naturalH, preserveAspectRatio: 'none' });
+    loupeImg.setAttribute('href', els.photo.src);
+    loupeImg.setAttributeNS('http://www.w3.org/1999/xlink', 'href', els.photo.src);
+    const cross1 = svgNS('line', { class: 'loupe-cross' });
+    const cross2 = svgNS('line', { class: 'loupe-cross' });
+    loupeSvg.appendChild(loupeImg);
+    loupeSvg.appendChild(cross1);
+    loupeSvg.appendChild(cross2);
+    const loupeBorder = svgNS('rect', { class: 'loupe-border', width: L, height: L });
+    const loupeG = svgNS('g', { style: 'display:none' });
+    loupeG.appendChild(loupeSvg);
+    loupeG.appendChild(loupeBorder);
+    els.overlay.appendChild(loupeG);
+
+    function update(){
+      poly.setAttribute('points', state.quad.map(p => p.x + ',' + p.y).join(' '));
+      state.quad.forEach((p, i) => {
+        dots[i].setAttribute('cx', p.x); dots[i].setAttribute('cy', p.y);
+        hits[i].setAttribute('cx', p.x); hits[i].setAttribute('cy', p.y);
+        const cxq = state.quad.reduce((s, q) => s + q.x, 0) / 4;
+        const cyq = state.quad.reduce((s, q) => s + q.y, 0) / 4;
+        const dx = p.x - cxq, dy = p.y - cyq, len = Math.hypot(dx, dy) || 1;
+        labels[i].setAttribute('x', p.x + (dx / len) * r * 2.4);
+        labels[i].setAttribute('y', p.y + (dy / len) * r * 2.4);
+        labels[i].setAttribute('text-anchor', 'middle');
+        labels[i].setAttribute('dominant-baseline', 'middle');
+      });
+    }
+
+    function updateLoupe(p){
+      const margin = W * 0.02;
+      const lx = p.x < state.naturalW / 2 ? state.naturalW - L - margin : margin;
+      const ly = margin;
+      loupeSvg.setAttribute('x', lx); loupeSvg.setAttribute('y', ly);
+      loupeSvg.setAttribute('viewBox', (p.x - region/2) + ' ' + (p.y - region/2) + ' ' + region + ' ' + region);
+      cross1.setAttribute('x1', p.x - region/2); cross1.setAttribute('x2', p.x + region/2);
+      cross1.setAttribute('y1', p.y); cross1.setAttribute('y2', p.y);
+      cross2.setAttribute('x1', p.x); cross2.setAttribute('x2', p.x);
+      cross2.setAttribute('y1', p.y - region/2); cross2.setAttribute('y2', p.y + region/2);
+      loupeBorder.setAttribute('x', lx); loupeBorder.setAttribute('y', ly);
+    }
+
+    state.quad.forEach((p, i) => {
+      makeDraggable(hits[i],
+        (cur, last) => {
+          p.x = Math.min(Math.max(p.x + (cur.x - last.x), 0), state.naturalW);
+          p.y = Math.min(Math.max(p.y + (cur.y - last.y), 0), state.naturalH);
+          update();
+          updateLoupe(p);
+        },
+        () => { loupeG.style.display = 'none'; },
+        () => { loupeG.style.display = ''; updateLoupe(p); }
+      );
+    });
+
+    update();
+    calibRefs = { update };
+  }
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      els.refW.value = chip.dataset.w;
+      els.refH.value = chip.dataset.h;
+    });
+  });
+
+  els.setScaleBtn.addEventListener('click', () => {
+    const rw = parseFloat(els.refW.value), rh = parseFloat(els.refH.value);
+    if (!(rw > 0) || !(rh > 0)){
+      showToast('Enter the real width and height first');
+      return;
+    }
+    if (!isConvexClockwise(state.quad)){
+      showToast('Corners are out of order — go TL, TR, BR, BL');
+      return;
+    }
+    const plane = [[0, 0], [rw, 0], [rw, rh], [0, rh]];
+    const img = state.quad.map(p => [p.x, p.y]);
+    const H = solveHomography(plane, img);
+    const Hinv = H ? invert3(H) : null;
+    if (!H || !Hinv || H.some(v => !isFinite(v))){
+      showToast('Those corners do not form a usable rectangle — adjust them');
+      return;
+    }
+    state.H = H; state.Hinv = Hinv;
+    state.refW = rw; state.refH = rh;
+    startSizing();
+  });
+
+  // =============== Stage 2: place + size the display ===============
+
+  function effectiveRatio(){ return state.orientation === 'landscape' ? state.ratio : 1 / state.ratio; }
+
+  function dims(){
+    const r = effectiveRatio();
+    const h = state.diagIn / Math.sqrt(r*r + 1);
+    return { w: h * r, h: h };
+  }
+
+  function defaultCenter(){
+    const c = unproj(state.naturalW / 2, state.naturalH / 2);
+    return c ? { x: c.x, y: c.y } : { x: state.refW / 2, y: state.refH / 2 };
+  }
+
+  function startSizing(){
+    state.stage = 'sizing';
+    els.calibFooter.classList.add('hidden');
+    els.sizeFooter.classList.remove('hidden');
+    els.saveBtn.classList.remove('invisible');
+    const c = defaultCenter();
+    state.cx = c.x; state.cy = c.y;
+    els.diagInput.value = state.diagIn;
+    buildSizing();
+  }
+
+  function screenCorners(){
+    const d = dims();
+    return [
+      [state.cx - d.w/2, state.cy - d.h/2],
+      [state.cx + d.w/2, state.cy - d.h/2],
+      [state.cx + d.w/2, state.cy + d.h/2],
+      [state.cx - d.w/2, state.cy + d.h/2]
+    ].map(c => proj(c[0], c[1]));
+  }
+
+  let sizeRefs = null;
+
+  function buildSizing(){
+    els.overlay.innerHTML = '';
+    const W = state.naturalW;
+
+    const poly = svgNS('polygon', { class: 'screen-poly' });
+    const label = svgNS('text', { class: 'screen-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': W * 0.04, 'stroke-width': W * 0.011 });
+    const resizeDot = svgNS('circle', { class: 'resize-handle', r: W * 0.016 });
+    const resizeHit = svgNS('circle', { class: 'resize-hit', r: W * 0.016 * 2.6 });
+    els.overlay.appendChild(poly);
+    els.overlay.appendChild(label);
+    els.overlay.appendChild(resizeDot);
+    els.overlay.appendChild(resizeHit);
+
+    function update(){
+      let pts = screenCorners();
+      if (pts.some(p => !p)){
+        const c = defaultCenter();
+        state.cx = c.x; state.cy = c.y;
+        pts = screenCorners();
+        if (pts.some(p => !p)){
+          showToast('That size runs past the wall plane — try something smaller');
+          return;
+        }
+      }
+      poly.setAttribute('points', pts.map(p => p.x + ',' + p.y).join(' '));
+      const center = proj(state.cx, state.cy);
+      label.setAttribute('x', center.x); label.setAttribute('y', center.y);
+      label.textContent = f1(state.diagIn) + '"';
+      resizeDot.setAttribute('cx', pts[2].x); resizeDot.setAttribute('cy', pts[2].y);
+      resizeHit.setAttribute('cx', pts[2].x); resizeHit.setAttribute('cy', pts[2].y);
+      updateReadouts();
+    }
+
+    // move along the wall: pointer motion is converted to wall-plane inches, so the display slides in true perspective
+    makeDraggable(poly, (cur, last) => {
+      const a = unproj(cur.x, cur.y), b = unproj(last.x, last.y);
+      if (!a || !b) return;
+      state.cx += a.x - b.x;
+      state.cy += a.y - b.y;
+      update();
+    });
+
+    // resize from the corner dot: distance from center to pointer (in wall inches) is half the diagonal
+    makeDraggable(resizeHit, (cur) => {
+      const p = unproj(cur.x, cur.y);
+      if (!p) return;
+      const dist = Math.hypot(p.x - state.cx, p.y - state.cy);
+      state.diagIn = Math.min(Math.max(dist * 2, 5), 400);
+      update();
+    });
+
+    sizeRefs = { update };
+    update();
+  }
+
+  function updateReadouts(){
+    const d = dims();
+    els.diagReadout.textContent = f1(state.diagIn) + '"';
+    els.dimReadout.textContent = f1(d.w) + '" W × ' + f1(d.h) + '" H';
+    if (document.activeElement !== els.diagInput) els.diagInput.value = f1(state.diagIn);
+  }
+
+  els.diagInput.addEventListener('input', () => {
+    const v = parseFloat(els.diagInput.value);
+    if (!isFinite(v) || v <= 0) return;
+    state.diagIn = Math.min(v, 400);
+    if (sizeRefs) sizeRefs.update();
+  });
+
+  document.getElementById('ratioSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#ratioSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.ratio = parseFloat(btn.dataset.r);
+    if (sizeRefs) sizeRefs.update();
+  });
+
+  document.getElementById('orientSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#orientSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.orientation = btn.dataset.o;
+    if (sizeRefs) sizeRefs.update();
+  });
+
+  els.recalibBtn.addEventListener('click', () => startCalibration(false));
+
+  // =============== Save a flattened image ===============
+
+  function saveImage(){
+    const pts = screenCorners();
+    if (pts.some(p => !p)){ showToast('Nothing to save yet'); return; }
+    const W = state.naturalW, H = state.naturalH;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(els.photo, 0, 0, W, H);
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(168,85,247,0.28)';
+    ctx.fill();
+    ctx.lineWidth = Math.max(W * 0.004, 3);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#a855f7';
+    ctx.stroke();
+
+    const center = proj(state.cx, state.cy);
+    const fontSize = W * 0.04;
+    ctx.font = '700 ' + fontSize + 'px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = fontSize * 0.28;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    const text = f1(state.diagIn) + '"';
+    ctx.strokeText(text, center.x, center.y);
+    ctx.fillStyle = 'white';
+    ctx.fillText(text, center.x, center.y);
+
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'screen-preview.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showToast('Saved');
+    }, 'image/png');
+  }
+
+  els.saveBtn.addEventListener('click', saveImage);
+  els.saveBtn2.addEventListener('click', saveImage);
+
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
